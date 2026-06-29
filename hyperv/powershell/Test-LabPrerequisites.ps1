@@ -28,9 +28,11 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltinRole]::Administra
     Add-Failure 'Administrator privileges are required.'
 }
 
-$hyperv = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All
-if ($hyperv.State -ne 'Enabled') {
-    Add-Failure 'Hyper-V feature is not enabled.'
+$vmms = Get-Service -Name vmms -ErrorAction SilentlyContinue
+if (-not $vmms) {
+    Add-Failure 'Hyper-V Virtual Machine Management service is missing; enable the Hyper-V feature.'
+} elseif ($vmms.Status -ne 'Running') {
+    Add-Failure "Hyper-V Virtual Machine Management service is $($vmms.Status); start the service or reboot."
 }
 
 if ($PSVersionTable.PSVersion.Major -lt 7) {
