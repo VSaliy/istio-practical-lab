@@ -1,0 +1,17 @@
+---
+name: powershell-analysis
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  psscriptanalyzer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          Invoke-ScriptAnalyzer -Path hyperv/powershell -Recurse -Severity Warning,Error

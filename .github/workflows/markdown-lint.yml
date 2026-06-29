@@ -1,0 +1,15 @@
+---
+name: markdown-lint
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - run: npm install -g markdownlint-cli@0.41.0
+      - run: markdownlint "**/*.md" --config .markdownlint.yml

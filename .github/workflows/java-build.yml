@@ -1,0 +1,18 @@
+---
+name: java-build
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - uses: actions/setup-java@3a4f6e1af504cf6a31855f4d14f7eca542df3bde
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: make java-build
