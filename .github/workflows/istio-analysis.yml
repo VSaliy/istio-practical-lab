@@ -12,5 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - run: |
-          curl -fsSL https://istio.io/downloadIstio | ISTIO_VERSION=1.24.2 TARGET_ARCH=x86_64 sh -
-          ./istio-1.24.2/bin/istioctl analyze istio/installation/profiles/lab-profile.yaml || true
+          ISTIO_VERSION="$(grep '^ISTIO_VERSION=' versions.env | cut -d= -f2)"
+          curl -fsSL https://istio.io/downloadIstio | ISTIO_VERSION="${ISTIO_VERSION}" TARGET_ARCH=x86_64 sh -
+          "./istio-${ISTIO_VERSION}/bin/istioctl" analyze -f istio/installation/profiles/lab-profile.yaml
