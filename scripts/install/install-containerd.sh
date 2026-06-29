@@ -30,4 +30,5 @@ mkdir -p /etc/containerd
 containerd config default >/etc/containerd/config.toml
 sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
 systemctl daemon-reload
-systemctl enable --now containerd
+systemctl enable containerd
+systemctl restart containerd
