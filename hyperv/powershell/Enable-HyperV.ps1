@@ -5,8 +5,9 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     throw "Run this script in an elevated PowerShell session."
 }
 
-$feature = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All
-if ($feature.State -eq 'Enabled') {
+$vmms = Get-Service -Name vmms -ErrorAction SilentlyContinue
+$hasHyperVModule = [bool](Get-Command Get-VM -ErrorAction SilentlyContinue)
+if ($vmms -and $hasHyperVModule) {
     Write-Host "Hyper-V is already enabled."
     exit 0
 }
