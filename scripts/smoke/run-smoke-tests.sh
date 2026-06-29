@@ -8,7 +8,7 @@ echo "[smoke] core pods"
 kubectl get pods -A
 
 echo "[smoke] istio analyze"
-istioctl analyze || true
+istioctl analyze
 
 echo "[smoke] bookinfo"
 kubectl -n bookinfo get pods,svc
