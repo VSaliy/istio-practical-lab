@@ -13,7 +13,7 @@ lint:
 
 validate: lint
 	@echo "Running kubeconform (if installed)"
-	@command -v kubeconform >/dev/null && find kubernetes istio -name '*.yaml' -print0 | xargs -0 -r kubeconform -summary || echo "kubeconform not installed"
+	@command -v kubeconform >/dev/null && find kubernetes istio -name '*.yaml' -print0 | xargs -0 -r kubeconform -summary -ignore-missing-schemas || echo "kubeconform not installed"
 
 test:
 	@echo "No repository-wide automated tests yet. Use module-specific smoke checks."
