@@ -4,8 +4,16 @@ kind: Installation
 metadata:
   name: default
 spec:
+  variant: Calico
   calicoNetwork:
+    bgp: Disabled
     mtu: 1450
+    ipPools:
+      - cidr: 10.244.0.0/16
+        encapsulation: VXLAN
+        natOutgoing: Enabled
+        nodeSelector: all()
+        blockSize: 26
 ---
 apiVersion: operator.tigera.io/v1
 kind: APIServer
