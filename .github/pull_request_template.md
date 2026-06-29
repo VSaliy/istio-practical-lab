@@ -6,4 +6,3 @@
 - [ ] make smoke (when cluster is available)
 
 ## Risk and Rollback
-

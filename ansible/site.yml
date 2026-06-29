@@ -6,4 +6,3 @@
     - common
     - containerd
     - kubernetes
-    - diagnostics
