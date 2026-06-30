@@ -4,58 +4,93 @@
 Intermediate
 
 ## Estimated effort
-90-180 minutes
+60-120 minutes
 
 ## Learning objectives
-- Understand module architecture and failure modes
-
-## Architectural context
-This module builds on previous exercises and contributes to production-style Istio operations.
+- Use namespaces as tenant boundaries.
+- Verify cross-namespace service access.
+- Apply an Istio authorization policy to block one tenant.
 
 ## Prerequisites
-- Previous exercises completed
-- Access to lab cluster
+- Bookinfo is healthy.
+- Authorization policies from other exercises are cleaned up.
 
 ## Files used
-- Module-specific manifests under istio/, kubernetes/, applications/, and scripts/
+- `exercises/15-multi-tenancy/manifests/deny-tenant-b-productpage.yaml`
 
 ## Environment checks
-- Verify kubectl can reach the cluster
-- Verify namespace/workload readiness
+```bash
+kubectl get ns bookinfo --show-labels
+kubectl get authorizationpolicy -A
+curl -I http://172.22.0.240/productpage
+```
 
 ## Implementation steps
-1. Follow documented script/manifests sequence.
-2. Apply resources incrementally.
-3. Validate expected behavior after each step.
+Create a second tenant namespace:
 
-## Commands
-Use explicit kubectl and istioctl commands listed for this module as they are implemented.
+```bash
+kubectl create namespace tenant-b
+kubectl label namespace tenant-b istio.io/rev=1-24-2
+kubectl run curl -n tenant-b --image=curlimages/curl --restart=Never -- sleep 3600
+kubectl wait --for=condition=Ready pod/curl -n tenant-b --timeout=120s
+kubectl get pod -n tenant-b
+```
 
-## Expected output
-Command outputs should show successful resource creation and healthy pod status.
+Expected: `curl` is `2/2 Running`.
 
-## Verification
-Perform explicit kubectl and istioctl checks tied to the module goals.
+Verify access before policy:
 
-## Failure experiments
-Introduce one controlled fault and observe control/data-plane behavior.
+```bash
+kubectl exec -n tenant-b curl -c curl -- curl -sS -o /dev/null -w "%{http_code}\n" \
+  http://productpage.bookinfo.svc.cluster.local:9080/productpage
+```
+
+Expected: `200`.
+
+Apply deny policy:
+
+```bash
+kubectl apply -f exercises/15-multi-tenancy/manifests/deny-tenant-b-productpage.yaml
+```
+
+Verify denial:
+
+```bash
+kubectl exec -n tenant-b curl -c curl -- curl -sS -o /dev/null -w "%{http_code}\n" \
+  http://productpage.bookinfo.svc.cluster.local:9080/productpage
+```
+
+Expected: `403`.
+
+Verify ingress still works:
+
+```bash
+curl -I http://172.22.0.240/productpage
+```
+
+Expected: `200 OK`.
 
 ## Troubleshooting
-Use diagnostics collectors in scripts/diagnostics and docs/troubleshooting.md.
+If the request still returns `200`, confirm injection and policy attachment:
+
+```bash
+kubectl get pod -n tenant-b curl -o jsonpath='{.spec.containers[*].name}{"\n"}'
+kubectl get authorizationpolicy deny-tenant-b -n bookinfo -o yaml
+kubectl get pod -n bookinfo -l app=productpage --show-labels
+istioctl analyze -n bookinfo
+```
 
 ## Cleanup
-Remove module-specific resources and restore baseline.
+```bash
+kubectl delete authorizationpolicy deny-tenant-b -n bookinfo --ignore-not-found
+kubectl delete namespace tenant-b --ignore-not-found
+curl -I http://172.22.0.240/productpage
+```
 
 ## Architectural lessons
-Capture trade-offs observed between reliability, security, and operational complexity.
-
-## Production considerations
-Translate lab choices to production-safe patterns.
+Namespaces are a useful tenancy boundary, but production multi-tenancy also needs ownership, quotas, RBAC, policy, and network segmentation.
 
 ## Self-assessment questions
-1. What failure mode was observed?
-2. How was it diagnosed?
-3. What policy/configuration fixed it?
-
-## Milestone status
-Detailed implementation for advanced modules is tracked as TODO for subsequent milestones.
+1. Why is namespace isolation not enough by itself?
+2. What does `source.namespaces` match?
+3. Why should ingress still work after blocking tenant-b?

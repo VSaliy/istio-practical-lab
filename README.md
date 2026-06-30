@@ -90,7 +90,7 @@ Pinned versions are centralized in `/versions.env` and compatibility rationale i
 
 ## Complete learning roadmap
 
-See `/docs/learning-roadmap.md` and `/exercises/01-hyperv-infrastructure` ... `/exercises/20-gitops`.
+See `/docs/learning-roadmap.md` and `/exercises/01-hyperv-infrastructure` ... `/exercises/21-gitops`.
 
 ## Repository navigation
 

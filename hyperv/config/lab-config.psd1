@@ -6,7 +6,8 @@
     HostInterfaceIp    = '172.22.0.1'
     HostInterfacePrefix= 24
     VmPath             = 'C:\HyperV\IstioLab'
-    IsoPath            = 'C:\ISO\ubuntu-24.04.2-live-server-amd64.iso'
+#    IsoPath            = 'C:\ISO\ubuntu-24.04.2-live-server-amd64.iso'
+    IsoPath            = 'E:\ISO\ubuntu-24.04.3-live-server-amd64.iso'
     SecureBootTemplate = 'MicrosoftUEFICertificateAuthority'
     StartupMemoryMode  = 'Fixed'
     Nodes = @(

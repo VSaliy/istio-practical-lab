@@ -26,7 +26,8 @@ The cluster uses kubeadm, containerd, and Calico VXLAN with explicit MTU for Hyp
 
 ## Environment checks
 ```bash
-ssh ubuntu@172.22.0.10 'hostname && ip a'
+LAB_USER="${LAB_USER:-ubuntu}"
+ssh "${LAB_USER}@172.22.0.10" 'hostname && ip a'
 ```
 
 ## Implementation steps
@@ -40,8 +41,9 @@ ssh ubuntu@172.22.0.10 'hostname && ip a'
 sudo bash scripts/linux/prepare-node.sh
 bash scripts/install/initialize-control-plane.sh
 JOIN_CMD=$(bash scripts/install/generate-worker-join-command.sh)
-ssh ubuntu@172.22.0.11 "sudo $(printf '%q' "$JOIN_CMD")"
-ssh ubuntu@172.22.0.12 "sudo $(printf '%q' "$JOIN_CMD")"
+LAB_USER="${LAB_USER:-ubuntu}"
+ssh -t "${LAB_USER}@172.22.0.11" "sudo $JOIN_CMD"
+ssh -t "${LAB_USER}@172.22.0.12" "sudo $JOIN_CMD"
 bash scripts/install/install-calico.sh
 bash scripts/install/install-metrics-server.sh
 ```

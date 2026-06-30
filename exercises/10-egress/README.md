@@ -4,58 +4,70 @@
 Intermediate
 
 ## Estimated effort
-90-180 minutes
+45-90 minutes
 
 ## Learning objectives
-- Understand module architecture and failure modes
-
-## Architectural context
-This module builds on previous exercises and contributes to production-style Istio operations.
+- Understand how Istio models outbound external services.
+- Create a `ServiceEntry` for `httpbin.org`.
+- Verify external HTTPS traffic from an injected workload.
 
 ## Prerequisites
-- Previous exercises completed
-- Access to lab cluster
+- Bookinfo namespace is injected.
+- Worker nodes have outbound internet access.
 
 ## Files used
-- Module-specific manifests under istio/, kubernetes/, applications/, and scripts/
+- `exercises/10-egress/manifests/httpbin-serviceentry.yaml`
 
 ## Environment checks
-- Verify kubectl can reach the cluster
-- Verify namespace/workload readiness
+```bash
+kubectl get ns bookinfo --show-labels
+curl -I https://httpbin.org/status/200
+```
 
 ## Implementation steps
-1. Follow documented script/manifests sequence.
-2. Apply resources incrementally.
-3. Validate expected behavior after each step.
+Create a mesh-injected curl pod:
 
-## Commands
-Use explicit kubectl and istioctl commands listed for this module as they are implemented.
+```bash
+kubectl run egress-curl -n bookinfo --image=curlimages/curl --restart=Never -- sleep 3600
+kubectl wait --for=condition=Ready pod/egress-curl -n bookinfo --timeout=120s
+kubectl get pod egress-curl -n bookinfo -o jsonpath='{.spec.containers[*].name}{"\n"}'
+```
 
-## Expected output
-Command outputs should show successful resource creation and healthy pod status.
+Apply the `ServiceEntry`:
 
-## Verification
-Perform explicit kubectl and istioctl checks tied to the module goals.
+```bash
+kubectl apply -f exercises/10-egress/manifests/httpbin-serviceentry.yaml
+kubectl get serviceentry -n bookinfo
+istioctl analyze -n bookinfo
+```
 
-## Failure experiments
-Introduce one controlled fault and observe control/data-plane behavior.
+Test egress:
+
+```bash
+kubectl exec -n bookinfo egress-curl -- curl -I https://httpbin.org/status/200
+```
+
+Expected: `HTTP/2 200` or `HTTP/1.1 200 OK`.
 
 ## Troubleshooting
-Use diagnostics collectors in scripts/diagnostics and docs/troubleshooting.md.
+If `kubectl exec ... -c curl` fails, check the container name:
+
+```bash
+kubectl get pod egress-curl -n bookinfo -o jsonpath='{.spec.containers[*].name}{"\n"}'
+```
+
+For a `kubectl run egress-curl ...` pod, the application container is usually named `egress-curl`, so you can omit `-c`.
 
 ## Cleanup
-Remove module-specific resources and restore baseline.
+```bash
+kubectl delete pod egress-curl -n bookinfo --ignore-not-found
+kubectl delete serviceentry httpbin-egress -n bookinfo --ignore-not-found
+```
 
 ## Architectural lessons
-Capture trade-offs observed between reliability, security, and operational complexity.
-
-## Production considerations
-Translate lab choices to production-safe patterns.
+`ServiceEntry` adds external hosts to Istio's service registry. It does not by itself block or allow all external traffic unless mesh outbound policy is configured to require registry-only access.
 
 ## Self-assessment questions
-1. What failure mode was observed?
-2. How was it diagnosed?
-3. What policy/configuration fixed it?
-
-## Milestone status
-Detailed implementation for advanced modules is tracked as TODO for subsequent milestones.
+1. What does `MESH_EXTERNAL` mean?
+2. Why is DNS resolution used for `httpbin.org`?
+3. What changes if outbound traffic policy is `REGISTRY_ONLY`?

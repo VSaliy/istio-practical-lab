@@ -1,61 +1,88 @@
 # Exercise 04: Sample Applications
 
 ## Difficulty
-Intermediate
+Beginner
 
 ## Estimated effort
-90-180 minutes
+45-90 minutes
 
 ## Learning objectives
-- Understand module architecture and failure modes
-
-## Architectural context
-This module builds on previous exercises and contributes to production-style Istio operations.
+- Deploy the Istio Bookinfo sample application.
+- Understand the service graph used by later exercises.
+- Verify application health through both cluster-internal and ingress paths.
 
 ## Prerequisites
-- Previous exercises completed
-- Access to lab cluster
+- Exercises 01-03 complete.
+- Istio installed with revision `1-24-2`.
 
 ## Files used
-- Module-specific manifests under istio/, kubernetes/, applications/, and scripts/
+- `scripts/install/deploy-bookinfo.sh`
+- `applications/bookinfo/README.md`
+- Istio sample manifests downloaded under `/tmp/istio-1.24.2`
 
 ## Environment checks
-- Verify kubectl can reach the cluster
-- Verify namespace/workload readiness
+```bash
+kubectl get pods -n istio-system
+istioctl version
+```
 
 ## Implementation steps
-1. Follow documented script/manifests sequence.
-2. Apply resources incrementally.
-3. Validate expected behavior after each step.
+Deploy Bookinfo:
+
+```bash
+bash scripts/install/deploy-bookinfo.sh
+```
+
+Wait for readiness:
+
+```bash
+kubectl wait --for=condition=Ready pod -l app=productpage -n bookinfo --timeout=180s
+kubectl wait --for=condition=Ready pod -l app=details -n bookinfo --timeout=180s
+kubectl wait --for=condition=Ready pod -l app=ratings -n bookinfo --timeout=180s
+kubectl wait --for=condition=Ready pod -l app=reviews -n bookinfo --timeout=180s
+```
 
 ## Commands
-Use explicit kubectl and istioctl commands listed for this module as they are implemented.
+```bash
+kubectl get ns bookinfo --show-labels
+kubectl get pods -n bookinfo
+kubectl get svc -n bookinfo
+kubectl get gateway,virtualservice -n bookinfo
+curl -I http://172.22.0.240/productpage
+```
 
 ## Expected output
-Command outputs should show successful resource creation and healthy pod status.
+- namespace `bookinfo` has `istio.io/rev=1-24-2`
+- Bookinfo pods show `2/2 Running`
+- ingress returns `HTTP/1.1 200 OK`
 
 ## Verification
-Perform explicit kubectl and istioctl checks tied to the module goals.
+```bash
+curl -s http://172.22.0.240/productpage | grep -i "Simple Bookstore"
+kubectl exec -n bookinfo deploy/productpage-v1 -c productpage -- curl -sS http://details:9080/details/0
+```
 
-## Failure experiments
-Introduce one controlled fault and observe control/data-plane behavior.
+## Failure experiment
+Scale one backend to zero and observe productpage degradation:
 
-## Troubleshooting
-Use diagnostics collectors in scripts/diagnostics and docs/troubleshooting.md.
+```bash
+kubectl scale deployment ratings-v1 -n bookinfo --replicas=0
+curl -s http://172.22.0.240/productpage | head
+kubectl scale deployment ratings-v1 -n bookinfo --replicas=1
+kubectl rollout status deployment/ratings-v1 -n bookinfo --timeout=180s
+```
 
 ## Cleanup
-Remove module-specific resources and restore baseline.
+Keep Bookinfo installed for later exercises. To fully remove it:
+
+```bash
+kubectl delete namespace bookinfo
+```
 
 ## Architectural lessons
-Capture trade-offs observed between reliability, security, and operational complexity.
-
-## Production considerations
-Translate lab choices to production-safe patterns.
+Bookinfo provides stable services and multiple versions of `reviews`, which makes it useful for traffic shifting, policy, and resilience experiments.
 
 ## Self-assessment questions
-1. What failure mode was observed?
-2. How was it diagnosed?
-3. What policy/configuration fixed it?
-
-## Milestone status
-Detailed implementation for advanced modules is tracked as TODO for subsequent milestones.
+1. Which Bookinfo service has multiple versions?
+2. Why do Bookinfo pods show `2/2` containers?
+3. Which Istio resources expose `/productpage` through the ingress gateway?

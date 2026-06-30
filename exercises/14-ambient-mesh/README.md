@@ -1,61 +1,70 @@
 # Exercise 14: Ambient Mesh
 
 ## Difficulty
-Intermediate
+Advanced
 
 ## Estimated effort
-90-180 minutes
+45-90 minutes
 
 ## Learning objectives
-- Understand module architecture and failure modes
-
-## Architectural context
-This module builds on previous exercises and contributes to production-style Istio operations.
+- Compare sidecar mode and ambient mode.
+- Identify why this lab is currently sidecar-based.
+- Understand the components required for ambient mesh.
 
 ## Prerequisites
-- Previous exercises completed
-- Access to lab cluster
+- Exercises 01-13 complete.
+- Current cluster is healthy in sidecar mode.
 
 ## Files used
-- Module-specific manifests under istio/, kubernetes/, applications/, and scripts/
+- `istio/ambient/README.md`
+- `istio/installation/profiles/lab-profile.yaml`
 
 ## Environment checks
-- Verify kubectl can reach the cluster
-- Verify namespace/workload readiness
+```bash
+kubectl get pods -n istio-system
+kubectl get pods -n bookinfo
+kubectl get daemonset -A | grep -E "ztunnel|cni" || true
+```
 
 ## Implementation steps
-1. Follow documented script/manifests sequence.
-2. Apply resources incrementally.
-3. Validate expected behavior after each step.
+Confirm current sidecar mode:
 
-## Commands
-Use explicit kubectl and istioctl commands listed for this module as they are implemented.
+```bash
+kubectl get ns bookinfo --show-labels
+kubectl get pod -n bookinfo -l app=productpage -o jsonpath='{.items[0].spec.containers[*].name}{"\n"}'
+kubectl get pod -n bookinfo -l app=productpage -o jsonpath='{.items[0].spec.initContainers[*].name}{"\n"}'
+```
 
-## Expected output
-Command outputs should show successful resource creation and healthy pod status.
+Expected:
+- namespace has `istio.io/rev=1-24-2`
+- pod has `istio-proxy`
+- pod has `istio-init`
+
+Check for ambient components:
+
+```bash
+kubectl get pods -A | grep -E "ztunnel|waypoint" || true
+kubectl get daemonset -A | grep ztunnel || true
+```
+
+Expected in this lab: no ambient dataplane components.
 
 ## Verification
-Perform explicit kubectl and istioctl checks tied to the module goals.
+```bash
+curl -I http://172.22.0.240/productpage
+istioctl proxy-status
+```
 
-## Failure experiments
-Introduce one controlled fault and observe control/data-plane behavior.
-
-## Troubleshooting
-Use diagnostics collectors in scripts/diagnostics and docs/troubleshooting.md.
+## Failure experiment
+Do not mix ambient installation changes into this sidecar lab unless the exercise explicitly asks for a cluster reset. Ambient requires a different dataplane model and additional components such as ztunnel, and later exercises assume the sidecar Bookinfo baseline.
 
 ## Cleanup
-Remove module-specific resources and restore baseline.
+No cleanup is required.
 
 ## Architectural lessons
-Capture trade-offs observed between reliability, security, and operational complexity.
-
-## Production considerations
-Translate lab choices to production-safe patterns.
+Sidecar mode puts Envoy in every pod. Ambient mode separates L4 node-level secure overlay from optional L7 waypoint proxies.
 
 ## Self-assessment questions
-1. What failure mode was observed?
-2. How was it diagnosed?
-3. What policy/configuration fixed it?
-
-## Milestone status
-Detailed implementation for advanced modules is tracked as TODO for subsequent milestones.
+1. What component provides the ambient L4 dataplane?
+2. Why does sidecar mode show `2/2` pods?
+3. Why should this lab avoid switching dataplane models midstream?

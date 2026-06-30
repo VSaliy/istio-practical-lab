@@ -4,58 +4,71 @@
 Intermediate
 
 ## Estimated effort
-90-180 minutes
+60-120 minutes
 
 ## Learning objectives
-- Understand module architecture and failure modes
-
-## Architectural context
-This module builds on previous exercises and contributes to production-style Istio operations.
+- Inject delays and aborts with Istio `VirtualService`.
+- Observe user-facing behavior when a dependency is slow or failing.
+- Restore baseline routing after resilience experiments.
 
 ## Prerequisites
-- Previous exercises completed
-- Access to lab cluster
+- Bookinfo is healthy.
+- Exercise 06 concepts understood.
 
 ## Files used
-- Module-specific manifests under istio/, kubernetes/, applications/, and scripts/
+- `exercises/07-resilience/manifests/ratings-delay.yaml`
+- `exercises/07-resilience/manifests/ratings-abort.yaml`
 
 ## Environment checks
-- Verify kubectl can reach the cluster
-- Verify namespace/workload readiness
+```bash
+kubectl get pods -n bookinfo
+curl -I http://172.22.0.240/productpage
+```
 
 ## Implementation steps
-1. Follow documented script/manifests sequence.
-2. Apply resources incrementally.
-3. Validate expected behavior after each step.
+Apply a delay to `ratings`:
 
-## Commands
-Use explicit kubectl and istioctl commands listed for this module as they are implemented.
+```bash
+kubectl apply -f exercises/07-resilience/manifests/ratings-delay.yaml
+time curl -s -o /dev/null -w "%{http_code}\n" http://172.22.0.240/productpage
+```
 
-## Expected output
-Command outputs should show successful resource creation and healthy pod status.
+Expected: request is slower but should still return an HTTP code.
+
+Replace delay with an abort:
+
+```bash
+kubectl apply -f exercises/07-resilience/manifests/ratings-abort.yaml
+curl -s http://172.22.0.240/productpage | head
+```
+
+Expected: productpage remains available, but reviews/ratings behavior is degraded.
 
 ## Verification
-Perform explicit kubectl and istioctl checks tied to the module goals.
+```bash
+kubectl get virtualservice ratings -n bookinfo -o yaml
+istioctl analyze -n bookinfo
+curl -I http://172.22.0.240/productpage
+```
 
-## Failure experiments
-Introduce one controlled fault and observe control/data-plane behavior.
-
-## Troubleshooting
-Use diagnostics collectors in scripts/diagnostics and docs/troubleshooting.md.
+## Failure experiment
+Increase fault percentage to `100` in either manifest and reapply. Confirm the application remains reachable but dependency output changes.
 
 ## Cleanup
-Remove module-specific resources and restore baseline.
+```bash
+kubectl delete virtualservice ratings -n bookinfo --ignore-not-found
+curl -I http://172.22.0.240/productpage
+```
 
 ## Architectural lessons
-Capture trade-offs observed between reliability, security, and operational complexity.
+Resilience policies should be tested from the user's path, not only from pod status. Pods can be healthy while traffic behavior is intentionally degraded.
 
 ## Production considerations
-Translate lab choices to production-safe patterns.
+- Use faults only in controlled test environments.
+- Pair retries/timeouts with service objectives and dependency capacity.
+- Keep rollback commands ready before applying policy changes.
 
 ## Self-assessment questions
-1. What failure mode was observed?
-2. How was it diagnosed?
-3. What policy/configuration fixed it?
-
-## Milestone status
-Detailed implementation for advanced modules is tracked as TODO for subsequent milestones.
+1. What is the difference between a delay and an abort fault?
+2. Why did productpage remain reachable when ratings was degraded?
+3. Which command restores baseline routing?

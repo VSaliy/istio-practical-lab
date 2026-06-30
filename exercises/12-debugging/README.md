@@ -4,58 +4,83 @@
 Intermediate
 
 ## Estimated effort
-90-180 minutes
+60-120 minutes
 
 ## Learning objectives
-- Understand module architecture and failure modes
-
-## Architectural context
-This module builds on previous exercises and contributes to production-style Istio operations.
+- Collect repeatable cluster diagnostics.
+- Debug Bookinfo from Kubernetes and Istio perspectives.
+- Separate pod health, service discovery, and mesh routing failures.
 
 ## Prerequisites
-- Previous exercises completed
-- Access to lab cluster
+- Bookinfo and Istio installed.
+- `kubectl` and `istioctl` work on `k8s-control-01`.
 
 ## Files used
-- Module-specific manifests under istio/, kubernetes/, applications/, and scripts/
+- `scripts/diagnostics/collect-cluster-diagnostics.sh`
+- `docs/troubleshooting.md`
 
 ## Environment checks
-- Verify kubectl can reach the cluster
-- Verify namespace/workload readiness
+```bash
+kubectl get nodes
+kubectl get pods -A
+istioctl proxy-status
+```
 
 ## Implementation steps
-1. Follow documented script/manifests sequence.
-2. Apply resources incrementally.
-3. Validate expected behavior after each step.
+Collect diagnostics:
 
-## Commands
-Use explicit kubectl and istioctl commands listed for this module as they are implemented.
+```bash
+bash scripts/diagnostics/collect-cluster-diagnostics.sh
+ls diagnostics
+```
 
-## Expected output
-Command outputs should show successful resource creation and healthy pod status.
+Inspect productpage:
+
+```bash
+POD=$(kubectl get pod -n bookinfo -l app=productpage -o jsonpath='{.items[0].metadata.name}')
+kubectl describe pod "$POD" -n bookinfo
+kubectl logs "$POD" -n bookinfo -c productpage --tail=50
+kubectl logs "$POD" -n bookinfo -c istio-proxy --tail=50
+```
+
+Inspect proxy configuration:
+
+```bash
+istioctl proxy-config listeners "$POD.bookinfo"
+istioctl proxy-config routes "$POD.bookinfo"
+istioctl proxy-config clusters "$POD.bookinfo" | grep bookinfo
+istioctl proxy-config endpoints "$POD.bookinfo" | grep bookinfo
+```
+
+## Failure experiment
+Break the Bookinfo `VirtualService`, observe the failure, then restore:
+
+```bash
+kubectl delete virtualservice bookinfo -n bookinfo
+curl -I http://172.22.0.240/productpage
+istioctl analyze -n bookinfo
+kubectl apply -n bookinfo -f /tmp/istio-1.24.2/samples/bookinfo/networking/bookinfo-gateway.yaml
+curl -I http://172.22.0.240/productpage
+```
 
 ## Verification
-Perform explicit kubectl and istioctl checks tied to the module goals.
-
-## Failure experiments
-Introduce one controlled fault and observe control/data-plane behavior.
-
-## Troubleshooting
-Use diagnostics collectors in scripts/diagnostics and docs/troubleshooting.md.
+```bash
+curl -I http://172.22.0.240/productpage
+istioctl proxy-status
+istioctl analyze -A
+```
 
 ## Cleanup
-Remove module-specific resources and restore baseline.
+Diagnostics directories can be kept for analysis. Remove them only when no longer needed:
+
+```bash
+ls diagnostics
+```
 
 ## Architectural lessons
-Capture trade-offs observed between reliability, security, and operational complexity.
-
-## Production considerations
-Translate lab choices to production-safe patterns.
+Debugging Istio requires checking both the Kubernetes object model and the generated Envoy configuration.
 
 ## Self-assessment questions
-1. What failure mode was observed?
-2. How was it diagnosed?
-3. What policy/configuration fixed it?
-
-## Milestone status
-Detailed implementation for advanced modules is tracked as TODO for subsequent milestones.
+1. Which command shows whether proxies are synced?
+2. Which logs show application behavior versus mesh proxy behavior?
+3. Why should diagnostics be collected before making fixes?

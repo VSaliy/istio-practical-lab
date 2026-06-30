@@ -4,58 +4,67 @@
 Intermediate
 
 ## Estimated effort
-90-180 minutes
+45-90 minutes
 
 ## Learning objectives
-- Understand module architecture and failure modes
-
-## Architectural context
-This module builds on previous exercises and contributes to production-style Istio operations.
+- Identify whether this lab uses sidecar init containers or Istio CNI.
+- Understand why Istio CNI changes pod startup and privilege boundaries.
+- Decide when not to retrofit CNI into a healthy lab cluster.
 
 ## Prerequisites
-- Previous exercises completed
-- Access to lab cluster
+- Bookinfo is running with sidecars.
 
 ## Files used
-- Module-specific manifests under istio/, kubernetes/, applications/, and scripts/
+- `istio/cni/README.md`
+- `istio/installation/profiles/lab-profile.yaml`
 
 ## Environment checks
-- Verify kubectl can reach the cluster
-- Verify namespace/workload readiness
+```bash
+kubectl get pods -n bookinfo
+kubectl get daemonset -A | grep -i cni || true
+```
 
 ## Implementation steps
-1. Follow documented script/manifests sequence.
-2. Apply resources incrementally.
-3. Validate expected behavior after each step.
+Inspect an injected pod:
 
-## Commands
-Use explicit kubectl and istioctl commands listed for this module as they are implemented.
+```bash
+POD=$(kubectl get pod -n bookinfo -l app=productpage -o jsonpath='{.items[0].metadata.name}')
+kubectl describe pod "$POD" -n bookinfo | grep -A10 "Init Containers:"
+```
 
-## Expected output
-Command outputs should show successful resource creation and healthy pod status.
+Expected:
+- `istio-init` is present
+- arguments include `istio-iptables`
+
+Inspect Istio system daemonsets:
+
+```bash
+kubectl get daemonset -n istio-system
+kubectl get daemonset -A | grep -i istio
+```
+
+Expected for this lab: no Istio CNI daemonset.
 
 ## Verification
-Perform explicit kubectl and istioctl checks tied to the module goals.
+```bash
+kubectl get pod "$POD" -n bookinfo -o jsonpath='{.spec.initContainers[*].name}{"\n"}'
+kubectl get pod "$POD" -n bookinfo -o jsonpath='{.spec.containers[*].name}{"\n"}'
+```
 
-## Failure experiments
-Introduce one controlled fault and observe control/data-plane behavior.
+Expected:
+- init container includes `istio-init`
+- containers include application and `istio-proxy`
 
-## Troubleshooting
-Use diagnostics collectors in scripts/diagnostics and docs/troubleshooting.md.
+## Failure experiment
+Do not install Istio CNI into this active sidecar lab as a casual experiment. Treat this exercise as inspection-only unless you reset the cluster or create a separate cluster specifically for CNI.
 
 ## Cleanup
-Remove module-specific resources and restore baseline.
+No cleanup is required.
 
 ## Architectural lessons
-Capture trade-offs observed between reliability, security, and operational complexity.
-
-## Production considerations
-Translate lab choices to production-safe patterns.
+Without Istio CNI, each injected pod uses an init container to configure traffic redirection. With Istio CNI, node-level CNI components handle that setup.
 
 ## Self-assessment questions
-1. What failure mode was observed?
-2. How was it diagnosed?
-3. What policy/configuration fixed it?
-
-## Milestone status
-Detailed implementation for advanced modules is tracked as TODO for subsequent milestones.
+1. What is the purpose of `istio-init`?
+2. Why can Istio CNI reduce pod privilege requirements?
+3. Why is CNI migration risky on an already-running lab?

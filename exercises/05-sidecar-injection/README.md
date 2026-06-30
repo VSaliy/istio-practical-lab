@@ -1,61 +1,101 @@
 # Exercise 05: Sidecar Injection
 
 ## Difficulty
-Intermediate
+Beginner
 
 ## Estimated effort
-90-180 minutes
+45-75 minutes
 
 ## Learning objectives
-- Understand module architecture and failure modes
-
-## Architectural context
-This module builds on previous exercises and contributes to production-style Istio operations.
+- Explain revision-based sidecar injection.
+- Compare injected and non-injected pods.
+- Safely recreate pods after changing namespace labels.
 
 ## Prerequisites
-- Previous exercises completed
-- Access to lab cluster
+- Bookinfo is deployed.
+- Istio revision is `1-24-2`.
 
 ## Files used
-- Module-specific manifests under istio/, kubernetes/, applications/, and scripts/
+- `scripts/install/deploy-bookinfo.sh`
+- `istio/installation/profiles/lab-profile.yaml`
 
 ## Environment checks
-- Verify kubectl can reach the cluster
-- Verify namespace/workload readiness
+```bash
+kubectl get ns bookinfo --show-labels
+kubectl get pods -n bookinfo
+```
+
+Expected:
+- `bookinfo` has `istio.io/rev=1-24-2`
+- Bookinfo pods are `2/2 Running`
 
 ## Implementation steps
-1. Follow documented script/manifests sequence.
-2. Apply resources incrementally.
-3. Validate expected behavior after each step.
+Inspect an injected pod:
 
-## Commands
-Use explicit kubectl and istioctl commands listed for this module as they are implemented.
+```bash
+POD=$(kubectl get pod -n bookinfo -l app=productpage -o jsonpath='{.items[0].metadata.name}')
+kubectl get pod "$POD" -n bookinfo -o jsonpath='{.spec.containers[*].name}{"\n"}'
+kubectl describe pod "$POD" -n bookinfo | grep -A8 "Init Containers:"
+```
 
-## Expected output
-Command outputs should show successful resource creation and healthy pod status.
+Create a namespace without injection:
+
+```bash
+kubectl create namespace no-injection-test
+kubectl run nginx -n no-injection-test --image=nginx --restart=Never
+kubectl wait --for=condition=Ready pod/nginx -n no-injection-test --timeout=120s
+kubectl get pod nginx -n no-injection-test -o jsonpath='{.spec.containers[*].name}{"\n"}'
+```
+
+Expected:
+
+```text
+nginx
+```
+
+Enable injection and recreate:
+
+```bash
+kubectl label namespace no-injection-test istio.io/rev=1-24-2
+kubectl delete pod nginx -n no-injection-test
+kubectl run nginx -n no-injection-test --image=nginx --restart=Never
+kubectl wait --for=condition=Ready pod/nginx -n no-injection-test --timeout=120s
+kubectl get pod nginx -n no-injection-test -o jsonpath='{.spec.containers[*].name}{"\n"}'
+```
+
+Expected:
+
+```text
+nginx istio-proxy
+```
 
 ## Verification
-Perform explicit kubectl and istioctl checks tied to the module goals.
+```bash
+kubectl get pod nginx -n no-injection-test
+istioctl proxy-status | grep no-injection-test
+```
 
-## Failure experiments
-Introduce one controlled fault and observe control/data-plane behavior.
+## Failure experiment
+Remove the label and create another pod:
 
-## Troubleshooting
-Use diagnostics collectors in scripts/diagnostics and docs/troubleshooting.md.
+```bash
+kubectl label namespace no-injection-test istio.io/rev-
+kubectl run nginx-plain -n no-injection-test --image=nginx --restart=Never
+kubectl wait --for=condition=Ready pod/nginx-plain -n no-injection-test --timeout=120s
+kubectl get pod nginx-plain -n no-injection-test -o jsonpath='{.spec.containers[*].name}{"\n"}'
+```
+
+Expected: only `nginx`.
 
 ## Cleanup
-Remove module-specific resources and restore baseline.
+```bash
+kubectl delete namespace no-injection-test
+```
 
 ## Architectural lessons
-Capture trade-offs observed between reliability, security, and operational complexity.
-
-## Production considerations
-Translate lab choices to production-safe patterns.
+Injection is decided when a pod is created. Changing namespace labels does not mutate existing pods.
 
 ## Self-assessment questions
-1. What failure mode was observed?
-2. How was it diagnosed?
-3. What policy/configuration fixed it?
-
-## Milestone status
-Detailed implementation for advanced modules is tracked as TODO for subsequent milestones.
+1. Why does a pod need to be recreated after enabling injection?
+2. What is the difference between `istio.io/rev` and legacy `istio-injection=enabled`?
+3. Which container handles mesh traffic for the application?

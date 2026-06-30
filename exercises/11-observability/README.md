@@ -4,58 +4,81 @@
 Intermediate
 
 ## Estimated effort
-90-180 minutes
+60-120 minutes
 
 ## Learning objectives
-- Understand module architecture and failure modes
-
-## Architectural context
-This module builds on previous exercises and contributes to production-style Istio operations.
+- Install and inspect Istio sample observability add-ons.
+- Generate Bookinfo traffic.
+- Use Kiali, Prometheus, and Envoy access logs for validation.
 
 ## Prerequisites
-- Previous exercises completed
-- Access to lab cluster
+- Bookinfo is reachable through ingress.
+- `/tmp/istio-1.24.2/samples/addons` exists.
 
 ## Files used
-- Module-specific manifests under istio/, kubernetes/, applications/, and scripts/
+- `/tmp/istio-1.24.2/samples/addons`
+- `scripts/diagnostics/collect-cluster-diagnostics.sh`
 
 ## Environment checks
-- Verify kubectl can reach the cluster
-- Verify namespace/workload readiness
+```bash
+ls /tmp/istio-1.24.2/samples/addons
+curl -I http://172.22.0.240/productpage
+```
 
 ## Implementation steps
-1. Follow documented script/manifests sequence.
-2. Apply resources incrementally.
-3. Validate expected behavior after each step.
+Install add-ons:
 
-## Commands
-Use explicit kubectl and istioctl commands listed for this module as they are implemented.
+```bash
+kubectl apply -f /tmp/istio-1.24.2/samples/addons/prometheus.yaml
+kubectl apply -f /tmp/istio-1.24.2/samples/addons/grafana.yaml
+kubectl apply -f /tmp/istio-1.24.2/samples/addons/kiali.yaml
+kubectl apply -f /tmp/istio-1.24.2/samples/addons/jaeger.yaml
+kubectl get pods -n istio-system
+```
 
-## Expected output
-Command outputs should show successful resource creation and healthy pod status.
+Generate traffic:
+
+```bash
+for i in {1..100}; do curl -s -o /dev/null http://172.22.0.240/productpage; done
+```
+
+Open Kiali through port-forward:
+
+```bash
+kubectl -n istio-system port-forward svc/kiali 20001:20001 --address 0.0.0.0
+```
+
+From Windows browser, open:
+
+```text
+http://172.22.0.10:20001/kiali
+```
 
 ## Verification
-Perform explicit kubectl and istioctl checks tied to the module goals.
+```bash
+istioctl proxy-status
+istioctl analyze -A
+kubectl logs -n istio-system deploy/istiod-1-24-2 --tail=50
+kubectl logs -n bookinfo deploy/productpage-v1 -c istio-proxy --tail=20
+```
 
-## Failure experiments
-Introduce one controlled fault and observe control/data-plane behavior.
-
-## Troubleshooting
-Use diagnostics collectors in scripts/diagnostics and docs/troubleshooting.md.
+Expected:
+- proxies are `SYNCED`
+- access logs show `GET /productpage 200`
+- Kiali graph shows Bookinfo traffic after refresh
 
 ## Cleanup
-Remove module-specific resources and restore baseline.
+```bash
+kubectl delete -f /tmp/istio-1.24.2/samples/addons/jaeger.yaml --ignore-not-found
+kubectl delete -f /tmp/istio-1.24.2/samples/addons/kiali.yaml --ignore-not-found
+kubectl delete -f /tmp/istio-1.24.2/samples/addons/grafana.yaml --ignore-not-found
+kubectl delete -f /tmp/istio-1.24.2/samples/addons/prometheus.yaml --ignore-not-found
+```
 
 ## Architectural lessons
-Capture trade-offs observed between reliability, security, and operational complexity.
-
-## Production considerations
-Translate lab choices to production-safe patterns.
+Observability must correlate Kubernetes health, Istio proxy state, telemetry, and user-facing requests. A healthy pod list alone is not enough.
 
 ## Self-assessment questions
-1. What failure mode was observed?
-2. How was it diagnosed?
-3. What policy/configuration fixed it?
-
-## Milestone status
-Detailed implementation for advanced modules is tracked as TODO for subsequent milestones.
+1. What does Kiali show that `kubectl get pods` cannot?
+2. Why should `istioctl analyze` be part of observability checks?
+3. Which container emits Envoy access logs?

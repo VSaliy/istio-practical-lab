@@ -4,58 +4,83 @@
 Intermediate
 
 ## Estimated effort
-90-180 minutes
+60-120 minutes
 
 ## Learning objectives
-- Understand module architecture and failure modes
-
-## Architectural context
-This module builds on previous exercises and contributes to production-style Istio operations.
+- Inspect Istio workload certificates.
+- Enforce strict mTLS in the Bookinfo namespace.
+- Prove non-mesh clients are rejected.
 
 ## Prerequisites
-- Previous exercises completed
-- Access to lab cluster
+- Bookinfo pods are injected and healthy.
+- `istioctl` is available.
 
 ## Files used
-- Module-specific manifests under istio/, kubernetes/, applications/, and scripts/
+- `exercises/08-security-mtls/manifests/bookinfo-strict-mtls.yaml`
 
 ## Environment checks
-- Verify kubectl can reach the cluster
-- Verify namespace/workload readiness
+```bash
+kubectl get ns bookinfo --show-labels
+kubectl get pods -n bookinfo
+```
 
 ## Implementation steps
-1. Follow documented script/manifests sequence.
-2. Apply resources incrementally.
-3. Validate expected behavior after each step.
+Inspect a proxy secret:
 
-## Commands
-Use explicit kubectl and istioctl commands listed for this module as they are implemented.
+```bash
+POD=$(kubectl get pod -n bookinfo -l app=productpage -o jsonpath='{.items[0].metadata.name}')
+istioctl proxy-config secret "$POD.bookinfo"
+```
 
-## Expected output
-Command outputs should show successful resource creation and healthy pod status.
+Apply strict mTLS:
+
+```bash
+kubectl apply -f exercises/08-security-mtls/manifests/bookinfo-strict-mtls.yaml
+kubectl get peerauthentication -n bookinfo
+```
+
+Create a non-injected test client:
+
+```bash
+kubectl create namespace mtls-test
+kubectl run curl -n mtls-test --image=curlimages/curl --restart=Never -- sleep 3600
+kubectl wait --for=condition=Ready pod/curl -n mtls-test --timeout=120s
+```
+
+Test from the non-mesh client:
+
+```bash
+kubectl exec -n mtls-test curl -- curl -sS -o /dev/null -w "%{http_code}\n" \
+  http://productpage.bookinfo.svc.cluster.local:9080/productpage
+```
+
+Expected: `000`, connection reset, or TLS-related failure.
+
+Verify ingress still works:
+
+```bash
+curl -I http://172.22.0.240/productpage
+```
+
+Expected: `200 OK`.
 
 ## Verification
-Perform explicit kubectl and istioctl checks tied to the module goals.
-
-## Failure experiments
-Introduce one controlled fault and observe control/data-plane behavior.
-
-## Troubleshooting
-Use diagnostics collectors in scripts/diagnostics and docs/troubleshooting.md.
+```bash
+kubectl get peerauthentication -n bookinfo
+istioctl analyze -n bookinfo
+```
 
 ## Cleanup
-Remove module-specific resources and restore baseline.
+```bash
+kubectl delete namespace mtls-test --ignore-not-found
+kubectl delete peerauthentication bookinfo-strict-mtls -n bookinfo --ignore-not-found
+curl -I http://172.22.0.240/productpage
+```
 
 ## Architectural lessons
-Capture trade-offs observed between reliability, security, and operational complexity.
-
-## Production considerations
-Translate lab choices to production-safe patterns.
+Strict mTLS requires mesh identity. Non-injected clients do not have Istio certificates and cannot connect to strict workloads.
 
 ## Self-assessment questions
-1. What failure mode was observed?
-2. How was it diagnosed?
-3. What policy/configuration fixed it?
-
-## Milestone status
-Detailed implementation for advanced modules is tracked as TODO for subsequent milestones.
+1. Why does a non-injected client fail under strict mTLS?
+2. Which Istio resource enforces mTLS mode?
+3. Why can ingress still work while a plain pod fails?

@@ -4,58 +4,79 @@
 Intermediate
 
 ## Estimated effort
-90-180 minutes
+45-90 minutes
 
 ## Learning objectives
-- Understand module architecture and failure modes
-
-## Architectural context
-This module builds on previous exercises and contributes to production-style Istio operations.
+- Trace external traffic through MetalLB and the Istio ingress gateway.
+- Inspect `Gateway` and `VirtualService` resources.
+- Recover from a broken ingress route.
 
 ## Prerequisites
-- Previous exercises completed
-- Access to lab cluster
+- MetalLB installed with pool `172.22.0.240-172.22.0.250`.
+- Istio ingress gateway has external IP `172.22.0.240`.
+- Bookinfo is deployed.
 
 ## Files used
-- Module-specific manifests under istio/, kubernetes/, applications/, and scripts/
+- `scripts/install/deploy-bookinfo.sh`
+- `/tmp/istio-1.24.2/samples/bookinfo/networking/bookinfo-gateway.yaml`
+- `kubernetes/metallb/ipaddresspool.yaml`
 
 ## Environment checks
-- Verify kubectl can reach the cluster
-- Verify namespace/workload readiness
+```bash
+kubectl get svc -n istio-system istio-ingressgateway
+kubectl get gateway,virtualservice -n bookinfo
+curl -I http://172.22.0.240/productpage
+```
 
 ## Implementation steps
-1. Follow documented script/manifests sequence.
-2. Apply resources incrementally.
-3. Validate expected behavior after each step.
+Inspect the ingress service:
 
-## Commands
-Use explicit kubectl and istioctl commands listed for this module as they are implemented.
+```bash
+kubectl describe svc -n istio-system istio-ingressgateway
+kubectl get endpoints -n istio-system istio-ingressgateway
+```
+
+Inspect Bookinfo routing:
+
+```bash
+kubectl get gateway bookinfo-gateway -n bookinfo -o yaml
+kubectl get virtualservice bookinfo -n bookinfo -o yaml
+```
+
+Test from cluster and host:
+
+```bash
+curl -I http://172.22.0.240/productpage
+curl -s http://172.22.0.240/productpage | grep -i "Simple Bookstore"
+```
 
 ## Expected output
-Command outputs should show successful resource creation and healthy pod status.
+- ingress gateway service type is `LoadBalancer`
+- external IP is `172.22.0.240`
+- `/productpage` returns `200 OK`
 
-## Verification
-Perform explicit kubectl and istioctl checks tied to the module goals.
+## Failure experiment
+Delete the `VirtualService` and observe failure:
 
-## Failure experiments
-Introduce one controlled fault and observe control/data-plane behavior.
+```bash
+kubectl delete virtualservice bookinfo -n bookinfo
+curl -I http://172.22.0.240/productpage
+```
 
-## Troubleshooting
-Use diagnostics collectors in scripts/diagnostics and docs/troubleshooting.md.
+Restore:
+
+```bash
+kubectl apply -n bookinfo -f /tmp/istio-1.24.2/samples/bookinfo/networking/bookinfo-gateway.yaml
+curl -I http://172.22.0.240/productpage
+```
 
 ## Cleanup
-Remove module-specific resources and restore baseline.
+No cleanup is required after restore.
 
 ## Architectural lessons
-Capture trade-offs observed between reliability, security, and operational complexity.
-
-## Production considerations
-Translate lab choices to production-safe patterns.
+MetalLB assigns an external IP to the Kubernetes service. Istio `Gateway` accepts traffic on that gateway, and `VirtualService` routes HTTP paths to internal services.
 
 ## Self-assessment questions
-1. What failure mode was observed?
-2. How was it diagnosed?
-3. What policy/configuration fixed it?
-
-## Milestone status
-Detailed implementation for advanced modules is tracked as TODO for subsequent milestones.
+1. Which object owns the external IP?
+2. Which object matches `/productpage`?
+3. Why does deleting the `VirtualService` break ingress while pods remain healthy?
