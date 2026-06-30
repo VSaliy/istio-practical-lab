@@ -1,0 +1,7 @@
+# Generate with:
+#   openssl passwd -6
+admin_password_hash = "$6$replace-with-real-sha512-password-hash"
+
+# Optional SSH keys:
+ssh_authorized_keys = []
+

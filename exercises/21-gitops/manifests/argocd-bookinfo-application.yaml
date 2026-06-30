@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bookinfo-routing
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/VSaliy/istio-practical-lab.git
+    targetRevision: HEAD
+    path: exercises/21-gitops/apps/bookinfo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bookinfo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=false
