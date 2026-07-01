@@ -1,0 +1,22 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: reviews
+  namespace: bookinfo
+spec:
+  hosts:
+  - reviews
+  http:
+  - route:
+    - destination:
+        host: reviews
+        subset: v1
+        port:
+          number: 9080
+      weight: 50
+    - destination:
+        host: reviews
+        subset: v3
+        port:
+          number: 9080
+      weight: 50

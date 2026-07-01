@@ -1,17 +1,27 @@
-# performance
+# Performance
 
-Initial implementation plan for this module is tracked in its corresponding exercise.
+This layer contains lightweight performance support material. The guided exercise is `exercises/19-performance`.
 
-## Expected files
+## Files
 
-- manifests and scripts for module-specific scenarios
+- `manifests/bookinfo-load-job.yaml`
 
-## Acceptance criteria
+## Run in-cluster load
 
-- executable commands
-- verification and cleanup guidance
-- troubleshooting notes
+```bash
+kubectl apply -f istio/performance/manifests/bookinfo-load-job.yaml
+kubectl wait --for=condition=Complete job/bookinfo-load -n bookinfo --timeout=180s
+kubectl logs job/bookinfo-load -n bookinfo
+```
 
-## TODO
+Watch metrics:
 
-- implement module scenarios in milestone 2+
+```bash
+watch -n 2 'kubectl top nodes && echo && kubectl top pods -n bookinfo && echo && kubectl top pods -n istio-system'
+```
+
+## Cleanup
+
+```bash
+kubectl delete job bookinfo-load -n bookinfo --ignore-not-found
+```

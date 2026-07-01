@@ -1,0 +1,24 @@
+---
+# Keep these values aligned with ../versions.env.
+kubernetes_version: "1.31.2"
+kubernetes_minor_version: "1.31"
+containerd_version: "1.7.23-1"
+crictl_version: "1.31.1"
+
+apt_prerequisite_packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gpg
+  - gnupg
+  - jq
+  - lsb-release
+  - python3-apt
+
+kubernetes_packages:
+  - "kubelet={{ kubernetes_version }}-1.1"
+  - "kubeadm={{ kubernetes_version }}-1.1"
+  - "kubectl={{ kubernetes_version }}-1.1"
+
+containerd_config_path: /etc/containerd/config.toml
+crictl_config_path: /etc/crictl.yaml

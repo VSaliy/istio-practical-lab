@@ -1,17 +1,44 @@
-# ambient
+# Ambient Mesh
 
-Initial implementation plan for this module is tracked in its corresponding exercise.
+Ambient mesh uses node-level `ztunnel` and optional waypoint proxies instead of sidecar proxies for all workloads.
 
-## Expected files
+## Lab caveat
 
-- manifests and scripts for module-specific scenarios
+This repository's main path uses classic sidecar mode. Ambient materials are for inspection and comparison. Do not mix old ambient components with a newer sidecar revision unless you intentionally upgrade ambient components too.
 
-## Acceptance criteria
+## Verification
 
-- executable commands
-- verification and cleanup guidance
-- troubleshooting notes
+Check for ambient components:
 
-## TODO
+```bash
+kubectl get daemonset -n istio-system | grep ztunnel
+kubectl get pods -n istio-system | grep ztunnel
+istioctl proxy-status
+```
 
-- implement module scenarios in milestone 2+
+Check namespace labels:
+
+```bash
+kubectl get ns --show-labels | grep 'istio.io/dataplane-mode'
+```
+
+## Enable ambient for a test namespace
+
+Use a separate namespace, not `bookinfo`, unless the exercise explicitly says so:
+
+```bash
+kubectl create namespace ambient-test
+kubectl label namespace ambient-test istio.io/dataplane-mode=ambient
+```
+
+## Cleanup
+
+```bash
+kubectl delete namespace ambient-test --ignore-not-found
+```
+
+If old ambient components remain after an upgrade and sidecar mode is the desired final state:
+
+```bash
+kubectl delete daemonset ztunnel -n istio-system --ignore-not-found
+```

@@ -1,0 +1,51 @@
+---
+- name: Verify Kubernetes node preparation
+  hosts: k8s_control:k8s_workers
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Check swap is disabled
+      ansible.builtin.command: swapon --show
+      register: swap_devices
+      changed_when: false
+      failed_when: swap_devices.stdout | length > 0
+
+    - name: Check overlay module is loaded
+      ansible.builtin.command: lsmod
+      register: loaded_modules
+      changed_when: false
+      failed_when: "'overlay' not in loaded_modules.stdout"
+
+    - name: Check br_netfilter module is loaded
+      ansible.builtin.command: lsmod
+      register: br_netfilter_module
+      changed_when: false
+      failed_when: "'br_netfilter' not in br_netfilter_module.stdout"
+
+    - name: Check IPv4 forwarding
+      ansible.builtin.command: sysctl -n net.ipv4.ip_forward
+      register: ip_forward
+      changed_when: false
+      failed_when: ip_forward.stdout != "1"
+
+    - name: Check containerd service
+      ansible.builtin.systemd:
+        name: containerd
+      register: containerd_service
+      failed_when: containerd_service.status.ActiveState != "active"
+
+    - name: Check crictl can reach containerd
+      ansible.builtin.command: crictl info
+      changed_when: false
+
+    - name: Check kubeadm client version
+      ansible.builtin.command: kubeadm version -o short
+      register: kubeadm_version
+      changed_when: false
+      failed_when: kubeadm_version.stdout != "v{{ kubernetes_version }}"
+
+    - name: Check kubectl client version
+      ansible.builtin.command: kubectl version --client=true --output=yaml
+      register: kubectl_client_version
+      changed_when: false
+      failed_when: "'gitVersion: v' ~ kubernetes_version not in kubectl_client_version.stdout"

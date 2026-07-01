@@ -1,17 +1,41 @@
-# gateway-api
+# Gateway API
 
-Initial implementation plan for this module is tracked in its corresponding exercise.
+This layer shows the Kubernetes Gateway API equivalent of the Bookinfo ingress route.
 
-## Expected files
+## Files
 
-- manifests and scripts for module-specific scenarios
+- `manifests/bookinfo-gateway-api.yaml`
 
-## Acceptance criteria
+## Prerequisites
 
-- executable commands
-- verification and cleanup guidance
-- troubleshooting notes
+Gateway API CRDs must be installed before applying these resources:
 
-## TODO
+```bash
+kubectl get crd gateways.gateway.networking.k8s.io
+kubectl get gatewayclass
+```
 
-- implement module scenarios in milestone 2+
+## Apply
+
+```bash
+kubectl apply -f istio/gateway-api/manifests/bookinfo-gateway-api.yaml
+kubectl get gateway,httproute -n bookinfo
+```
+
+## Verify
+
+Find the gateway address:
+
+```bash
+kubectl get gateway bookinfo-gateway-api -n bookinfo
+```
+
+Then test the address shown by the Gateway API implementation.
+
+## Cleanup
+
+```bash
+kubectl delete -f istio/gateway-api/manifests/bookinfo-gateway-api.yaml --ignore-not-found
+```
+
+Classic Istio `Gateway` resources under `istio/gateways` remain the primary lab ingress path.

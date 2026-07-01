@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab-test
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl
+  namespace: lab-test
+  labels:
+    app: curl
+spec:
+  restartPolicy: Never
+  containers:
+    - name: curl
+      image: curlimages/curl:latest
+      command:
+        - sleep
+        - "3600"
