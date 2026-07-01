@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/VSaliy/istio-practical-lab.git
-    targetRevision: HEAD
+    targetRevision: feature/excercises
     path: exercises/21-gitops/apps/bookinfo
   destination:
     server: https://kubernetes.default.svc
