@@ -14,7 +14,7 @@ $config = Import-PowerShellDataFile -Path $ConfigPath
 foreach ($name in $config.Nodes.Name) {
     $vm = Get-VM -Name $name -ErrorAction SilentlyContinue
     if ($vm) {
-        if ($vm.State -eq 'Running') { Stop-VM -Name $name -Shutdown -Force }
+        if ($vm.State -eq 'Running') { Stop-VM -Name $name -TurnOff -Force }
         if ($PSCmdlet.ShouldProcess($name, 'Remove VM')) {
             Remove-VM -Name $name -Force
         }
@@ -33,8 +33,10 @@ if ($switch -and $PSCmdlet.ShouldProcess($config.SwitchName, 'Remove virtual swi
 
 if ($DeleteVhdx) {
     Write-Warning 'Deleting VHDX files from VM path was explicitly requested.'
-    if ($PSCmdlet.ShouldProcess($config.VmPath, 'Remove VM directory recursively')) {
+    if ((Test-Path -LiteralPath $config.VmPath) -and $PSCmdlet.ShouldProcess($config.VmPath, 'Remove VM directory recursively')) {
         Remove-Item -Path $config.VmPath -Recurse -Force
+    } elseif (-not (Test-Path -LiteralPath $config.VmPath)) {
+        Write-Host "VM path does not exist; nothing to delete: $($config.VmPath)"
     }
 } else {
     Write-Host 'VHDX files preserved by default.'

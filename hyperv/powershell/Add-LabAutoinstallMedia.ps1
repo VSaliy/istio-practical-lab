@@ -11,6 +11,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $resolvedNodesJsonPath = Resolve-Path -LiteralPath $NodesJsonPath
+if (-not (Test-Path -LiteralPath $MediaDirectory)) {
+    throw "Autoinstall media directory not found: $MediaDirectory. If you ran Remove-Lab.ps1 -DeleteVhdx, regenerate seed media with New-LabAutoinstallMedia.ps1 before attaching it."
+}
 $resolvedMediaDirectory = Resolve-Path -LiteralPath $MediaDirectory
 $config = Get-Content -LiteralPath $resolvedNodesJsonPath -Raw | ConvertFrom-Json
 
@@ -37,4 +40,3 @@ foreach ($node in $config.nodes) {
     Add-VMDvdDrive -VMName $vmName -Path $isoPath
     Write-Host "Attached autoinstall seed ISO to '$vmName': $isoPath"
 }
-

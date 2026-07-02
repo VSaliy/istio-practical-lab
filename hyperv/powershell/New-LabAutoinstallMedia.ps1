@@ -26,9 +26,18 @@ function New-SeedIso {
         [Parameter(Mandatory)][string]$IsoPath
     )
 
-    $oscdimg = Get-Command oscdimg.exe -ErrorAction SilentlyContinue
+    $adkOscdimgPath = 'C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe'
+    $oscdimg = $null
+    if (Test-Path -LiteralPath $adkOscdimgPath) {
+        $oscdimg = Get-Item -LiteralPath $adkOscdimgPath
+    }
+    if (-not $oscdimg) {
+        $oscdimg = Get-Command oscdimg.exe -ErrorAction SilentlyContinue
+    }
+
     if ($oscdimg) {
-        & $oscdimg.Source -o -m -j2 -lCIDATA $SourceDirectory $IsoPath | Out-Host
+        $oscdimgPath = if ($oscdimg.PSObject.Properties.Name -contains 'Source') { $oscdimg.Source } else { $oscdimg.FullName }
+        & $oscdimgPath -o -m -j2 -lCIDATA $SourceDirectory $IsoPath | Out-Host
         if ($LASTEXITCODE -ne 0) {
             throw "oscdimg.exe failed with exit code $LASTEXITCODE"
         }
@@ -83,6 +92,17 @@ foreach ($node in $config.nodes) {
         "    authorized-keys:$([Environment]::NewLine)$sshKeysYaml"
     }
     $nameserverYaml = ($node.nameservers | ForEach-Object { "          - $_" }) -join [Environment]::NewLine
+    $autoinstallNameserverYaml = ($node.nameservers | ForEach-Object { "            - $_" }) -join [Environment]::NewLine
+    $labMacAddress = if ($node.PSObject.Properties.Name -contains 'lab_mac_address') { [string]$node.lab_mac_address } else { '' }
+    $internetMacAddress = if ($node.PSObject.Properties.Name -contains 'internet_mac_address') { [string]$node.internet_mac_address } else { '' }
+
+    if ([string]::IsNullOrWhiteSpace($labMacAddress)) {
+        throw "Node $($node.name) is missing lab_mac_address. Regenerate $NodesJsonPath with New-LabAutoinstallConfig.ps1."
+    }
+
+    if ([string]::IsNullOrWhiteSpace($internetMacAddress)) {
+        throw "Node $($node.name) is missing internet_mac_address. Regenerate $NodesJsonPath with New-LabAutoinstallConfig.ps1."
+    }
 
     $userData = @"
 #cloud-config
@@ -105,9 +125,33 @@ $sshBlock
   storage:
     layout:
       name: lvm
+  network:
+    version: 2
+    ethernets:
+      lab:
+        match:
+          macaddress: "$labMacAddress"
+        set-name: eth0
+        dhcp4: false
+        addresses:
+          - $($node.address)/$($node.prefix)
+        routes:
+          - to: default
+            via: $($node.gateway)
+        nameservers:
+          addresses:
+$autoinstallNameserverYaml
+      internet:
+        match:
+          macaddress: "$internetMacAddress"
+        set-name: eth1
+        dhcp4: true
+        optional: true
   updates: security
   late-commands:
     - curtin in-target --target=/target -- systemctl enable ssh
+    - curtin in-target --target=/target -- sh -c 'echo "$($config.username) ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-lab-automation'
+    - curtin in-target --target=/target -- chmod 0440 /etc/sudoers.d/90-lab-automation
 "@
 
     $metaData = @"
@@ -118,7 +162,10 @@ local-hostname: $($node.hostname)
     $networkConfig = @"
 version: 2
 ethernets:
-  eth0:
+  lab:
+    match:
+      macaddress: "$labMacAddress"
+    set-name: eth0
     dhcp4: false
     addresses:
       - $($node.address)/$($node.prefix)
@@ -128,6 +175,12 @@ ethernets:
     nameservers:
       addresses:
 $nameserverYaml
+  internet:
+    match:
+      macaddress: "$internetMacAddress"
+    set-name: eth1
+    dhcp4: true
+    optional: true
 "@
 
     Set-Content -LiteralPath (Join-Path $seedDir 'user-data') -Value $userData -Encoding utf8NoBOM
